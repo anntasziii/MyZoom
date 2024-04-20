@@ -8,7 +8,6 @@ export default function Navbar() {
             <SignedIn>
                 <div className="flex items-center gap-5">
                     <Link href="/meetings">Meetings</Link>
-                    asfgnsjk
                     <UserButton />
                 </div>
             </SignedIn>
