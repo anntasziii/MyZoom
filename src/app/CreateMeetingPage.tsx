@@ -1,16 +1,45 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs"
-import { useStreamVideoClient } from "@stream-io/video-react-sdk";
+import { useStreamVideoClient, Call } from "@stream-io/video-react-sdk";
 import { Loader2 } from "lucide-react"
 import { useState } from "react";
+import { error } from 'console';
 
 export default function CreateMeetingPage() {
 
     const [descriptionInput, setDescriptionInput] = useState("");
     const [startTimeInput, setStartTimeInput] = useState("");
+    const [participantsInput, setParticipantsInput] = useState("");
+
+    const [call, setCall] = useState<Call>();
+
     const client = useStreamVideoClient();
     const { user } = useUser();
+
+    async function createMeeting() {
+        if (!client || !user) {
+            return;
+        }
+        try {
+            const id = crypto.randomUUID();
+            const callType = participantsInput ? "private-meeting" : "default";
+            const call = client.call("default", id);
+
+            await call.getOrCreate({
+                data: {
+                //   starts_at,
+                //   members,
+                  custom: { description: descriptionInput },
+                },
+              });
+              setCall(call);
+        }
+        catch(error){
+            console.error(error);
+            alert("Something went wrong. Please try again later");
+        }
+    }
 
     if(!client || !user){
         return <Loader2 className="mx-auto animate-spin"/>;
@@ -24,7 +53,15 @@ export default function CreateMeetingPage() {
             </h2>
             <DescriptionInput value={descriptionInput} onChange={setDescriptionInput}/>
             <StartTimeInput value={startTimeInput} onChange={setStartTimeInput} />
+            <ParticipantsInput
+                value={participantsInput}
+                onChange={setParticipantsInput}
+            />
+            <button onClick={createMeeting} className="w-full">
+                Create meeting
+            </button>
         </div>
+        {call && <MeetingLink call={call} />}
     </div>
 }
 
@@ -71,9 +108,10 @@ interface StartTimeInputProps {
 
 function StartTimeInput({value, onChange}: StartTimeInputProps){
     const [active, setActive] = useState(false);
+
     const dateTimeLocalNow = new Date(
         new Date().getTime() - new Date().getTimezoneOffset() * 60_000
-      ).toISOString().slice(0, 16)
+      ).toISOString().slice(0, 16);
 
     return <div className="space-y-2">
         <div className="font-medium">Meeting start:</div>
@@ -111,5 +149,54 @@ function StartTimeInput({value, onChange}: StartTimeInputProps){
                 />
             </label>
         )}
+    </div>
+}
+
+interface ParticipantsInputProps{
+    value: string,
+    onChange: (value: string) => void;
+}
+
+function ParticipantsInput({value, onChange}: ParticipantsInputProps){
+    const [active, setActive] = useState(false);
+    return <div className="space-y-2">
+        <div className="font-medium">Participants:</div>
+        <label className="flex items-center gap-1.5">
+        <input
+          type="radio"
+          checked={!active}
+          onChange={() => {
+            setActive(false);
+            onChange("");
+          }}
+        />
+        Everyone with link can join
+      </label>
+      <label className="flex items-center gap-1.5">
+        <input type="radio" checked={active} onChange={() => setActive(true)} />
+        Private meeting
+      </label>
+      {active && (
+        <label className="block space-y-1">
+            <span className="font-medium">Participant emails</span>
+            <textarea
+                value={value}
+                onChange={(e) => onChange(e.target.value)}
+                placeholder="Enter participant email addresses separated by commas"
+                className="w-full rounded-md border border-gray-300 p-2"
+            />
+        </label>
+      )}
+    </div>
+}
+
+interface MeetingLinkProps {
+    call: Call;
+}
+
+function MeetingLink({ call }: MeetingLinkProps) {
+    const meetingLink = `${process.env.NEXT_PUBLIC_BASE_URL}/meeting/${call.id}`;
+    return <div className="text-center">
+        {meetingLink}
     </div>
 }
