@@ -1,10 +1,13 @@
 "use client";
 
 import { useUser } from "@clerk/nextjs"
-import { useStreamVideoClient, Call } from "@stream-io/video-react-sdk";
-import { Loader2 } from "lucide-react"
+import { useStreamVideoClient, Call, MemberRequest} from "@stream-io/video-react-sdk";
+import { Loader2, Copy } from "lucide-react"
 import { useState } from "react";
 import { error } from 'console';
+import { getUserIds } from "./actions"
+import Button from "@/components/Button";
+import Link from "next/link";
 
 export default function CreateMeetingPage() {
 
@@ -24,12 +27,27 @@ export default function CreateMeetingPage() {
         try {
             const id = crypto.randomUUID();
             const callType = participantsInput ? "private-meeting" : "default";
-            const call = client.call("default", id);
+            const call = client.call(callType, id);
+
+            const memberEmails = participantsInput
+                .split(",")
+                .map((email) => email.trim());
+
+            const memberIds = await getUserIds(memberEmails);
+
+            const members: MemberRequest[] = memberIds
+                .map((id) => ({ user_id: id, role: "call_member" }))
+                .concat({ user_id: user.id, role: "call_member" })
+                .filter(
+                (v, i, a) => a.findIndex((v2) => v2.user_id === v.user_id) === i,
+                );
+    
+            const starts_at = new Date(startTimeInput || Date.now()).toISOString();
 
             await call.getOrCreate({
                 data: {
-                //   starts_at,
-                //   members,
+                  starts_at,
+                  members,
                   custom: { description: descriptionInput },
                 },
               });
@@ -57,9 +75,9 @@ export default function CreateMeetingPage() {
                 value={participantsInput}
                 onChange={setParticipantsInput}
             />
-            <button onClick={createMeeting} className="w-full">
+            <Button onClick={createMeeting} className="w-full">
                 Create meeting
-            </button>
+            </Button>
         </div>
         {call && <MeetingLink call={call} />}
     </div>
@@ -196,7 +214,62 @@ interface MeetingLinkProps {
 
 function MeetingLink({ call }: MeetingLinkProps) {
     const meetingLink = `${process.env.NEXT_PUBLIC_BASE_URL}/meeting/${call.id}`;
-    return <div className="text-center">
-        {meetingLink}
+    return <div className="flex flex-col items-center gap-3 text-center">
+        <div className="flex items-center gap-3">
+            <span>
+                Invitation link:{" "}
+                <Link href={meetingLink} className="font-medium">
+                    {meetingLink}
+                </Link>
+            </span>
+            <button
+                title="Copy invitation link"
+                onClick={() => {
+                    navigator.clipboard.writeText(meetingLink);
+                    alert("Copied to clipboard");
+                }}
+                >
+                <Copy />
+            </button>
+        </div>
+        <div>
+        <a
+            href={getMailToLink(
+            meetingLink,
+            call.state.startsAt,
+            call.state.custom.description,
+            )}
+            target="_blank"
+            className="text-blue-500 hover:underline"
+        >
+            Send email invitation
+        </a>
+        </div>
     </div>
+}
+
+function getMailToLink(
+    meetingLink: string,
+    startsAt?: Date,
+    description?: string,)
+{
+    const startDateFormatted = startsAt
+    ? startsAt.toLocaleString("en-US", {
+        dateStyle: "full",
+        timeStyle: "short",
+      })
+    : undefined;
+
+    const subject =
+    "Join my meeting" + (startDateFormatted ? ` at ${startDateFormatted}` : "");
+
+    const body =
+    `Join my meeting at ${meetingLink}.` +
+    (startDateFormatted
+      ? `\n\nThe meeting starts at ${startDateFormatted}.`
+      : "") +
+    (description ? `\n\nDescription: ${description}` : "");
+
+  return `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+
 }

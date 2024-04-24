@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+'use client';
+
+import { useState } from 'react';
 import { Call, CallControls, SpeakerLayout, useStreamVideoClient} from "@stream-io/video-react-sdk";
 import { Loader2 } from "lucide-react";
 import {
@@ -15,7 +17,7 @@ interface MeetingPageProps{
 }
 
 export default function MeetingPage({id}: MeetingPageProps){
-    
+
     const [call, setCall] = useState<Call>();
 
     const client = useStreamVideoClient();
@@ -24,15 +26,17 @@ export default function MeetingPage({id}: MeetingPageProps){
         return <Loader2 className="mx-auto animate-spin" />
     }
     if(!call){
-        return <button 
-            onClick={async()=>{
-                const call = client.call("default", id)
-                await call.join();
-                setCall(call);
-            }}
-            >
-                Join meeting
+        return (
+            <button 
+                onClick={async() => {
+                    const call = client.call("private-meeting", id);
+                    await call.join();
+                    setCall(call);
+                }}
+                >
+                    Join meeting
             </button>
+        );
     }
     return (
         <StreamCall call={call}>
@@ -41,5 +45,5 @@ export default function MeetingPage({id}: MeetingPageProps){
                 <CallControls />
             </StreamTheme>
         </StreamCall>
-    )
+    );
 }
